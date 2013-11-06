@@ -26,6 +26,10 @@ end)
 a:set(0, 70000)
 b:set(30000, 70000)
 
+benchmark('offsets', 50, function(i)
+  a:offsets()
+end)
+
 benchmark('weight', 600, function(i)
   a:weight()
 end)

@@ -244,6 +244,23 @@ int bitmapL_csv(lua_State *L) {
   return 1;
 }
 
+int bitmapL_offsets(lua_State *L) {
+  bitmapL_t *wrap = luaL_checkbitmapL_t(L, 1);
+  int bits = (int) wrap->bits;
+  int cur, i = 1;
+
+  lua_newtable(L);
+
+  cur = find_first_bit(wrap->map, bits);
+  while (cur < bits) {
+    lua_pushinteger(L, cur);
+    lua_rawseti(L, -2, i++);
+    cur = find_next_bit(wrap->map, bits, cur+1);
+  }
+
+  return 1;
+}
+
 static const struct luaL_reg bitmapL_mt[] = {
     {"__gc",   bitmapL_free},
     {"zero",   bitmapL_zero},
@@ -264,6 +281,7 @@ static const struct luaL_reg bitmapL_mt[] = {
     {"empty",  bitmapL_empty},
     {"full",   bitmapL_full},
     {"weight", bitmapL_weight},
+    {"offsets", bitmapL_offsets},
     {NULL, NULL}
 };
 
