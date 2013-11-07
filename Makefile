@@ -27,8 +27,8 @@ benchmark: all
 bitmap.so: lua_bitmap.o bitmap.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
-lua_bitmap.o: lua_bitmap.c
+lua_bitmap.o: lua_bitmap.c bitmap.h
 	$(CC) $(CFLAGS) $(LUAINC) -c $<
 
-bitmap.o: bitmap.c
+bitmap.o: bitmap.c bitmap.h
 	$(CC) $(CFLAGS) $(LUAINC) -c $<

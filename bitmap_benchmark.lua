@@ -2,7 +2,7 @@ local BMSPF = "[B] %-12s%-15s%dms"
 
 function benchmark(context, cycles, fun)
   local start = os.clock()
-  local cycles = cycles or 1e6
+  local cycles = cycles
   for c=0,cycles-1 do fun(c) end
   print(BMSPF:format(context, " (" .. cycles .. "x)", (os.clock()-start) * 1000))
 end
@@ -26,22 +26,22 @@ end)
 a:set(0, 70000)
 b:set(30000, 70000)
 
-benchmark('offsets', 50, function(i)
+benchmark('offsets', 500, function(i)
   a:offsets()
 end)
 
-benchmark('weight', 600, function(i)
+benchmark('weight', 20000, function(i)
   a:weight()
 end)
 
-benchmark('bor', 300, function(i)
+benchmark('bor', 20000, function(i)
   a:bor(b)
 end)
 
-benchmark('band', 2000, function(i)
+benchmark('band', 20000, function(i)
   a:band(b)
 end)
 
-benchmark('bandnot', 200, function(i)
+benchmark('bandnot', 20000, function(i)
   a:bandnot(b)
 end)

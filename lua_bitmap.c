@@ -27,12 +27,14 @@
 #include <lauxlib.h>
 #include <malloc.h>
 #include <stdio.h>
+
+#define BIT_HAS_FAST_MULT
 #include "bitmap.h"
 
 #define BMAP_LUA_MT "bitmap_mt"
 
 typedef struct {
-  unsigned long *map;
+  bitmap_t *map;
   size_t bits;
 } bitmapL_t;
 
@@ -49,7 +51,7 @@ static void lua_pushbitmap_t(lua_State *L, bitmapL_t *wrap) {
 
 static bitmapL_t* bitmapL_t_create(size_t bits) {
   bitmapL_t *wrap = malloc(sizeof(bitmapL_t));
-  wrap->map = calloc(BITS_TO_LONGS(bits), sizeof(unsigned long));
+  wrap->map = calloc(BITS_TO_WORDS(bits), sizeof(bitmap_t));
   wrap->bits = bits;
   return wrap;
 }

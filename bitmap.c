@@ -36,9 +36,9 @@
 
 /*
  * bitmaps provide an array of bits, implemented using an an
- * array of unsigned longs.  The number of valid bits in a
+ * array of bitmap_t.  The number of valid bits in a
  * given bitmap does _not_ need to be an exact multiple of
- * BITS_PER_LONG.
+ * BITS_PER_WORD.
  *
  * The possible unused bits in the last, partially used word
  * of a bitmap are 'don't care'.  The implementation makes
@@ -55,56 +55,56 @@
  * in output bitmaps.
  */
 
-int __bitmap_empty(const unsigned long *bitmap, int bits)
+int __bitmap_empty(const bitmap_t *bitmap, int bits)
 {
-  int k, lim = bits/BITS_PER_LONG;
+  int k, lim = bits/BITS_PER_WORD;
   for (k = 0; k < lim; ++k)
     if (bitmap[k])
       return 0;
 
-  if (bits % BITS_PER_LONG)
+  if (bits % BITS_PER_WORD)
     if (bitmap[k] & BITMAP_LAST_WORD_MASK(bits))
       return 0;
 
   return 1;
 }
 
-int __bitmap_full(const unsigned long *bitmap, int bits)
+int __bitmap_full(const bitmap_t *bitmap, int bits)
 {
-  int k, lim = bits/BITS_PER_LONG;
+  int k, lim = bits/BITS_PER_WORD;
   for (k = 0; k < lim; ++k)
     if (~bitmap[k])
       return 0;
 
-  if (bits % BITS_PER_LONG)
+  if (bits % BITS_PER_WORD)
     if (~bitmap[k] & BITMAP_LAST_WORD_MASK(bits))
       return 0;
 
   return 1;
 }
 
-int __bitmap_equal(const unsigned long *bitmap1,
-       const unsigned long *bitmap2, int bits)
+int __bitmap_equal(const bitmap_t *bitmap1,
+       const bitmap_t *bitmap2, int bits)
 {
-  int k, lim = bits/BITS_PER_LONG;
+  int k, lim = bits/BITS_PER_WORD;
   for (k = 0; k < lim; ++k)
     if (bitmap1[k] != bitmap2[k])
       return 0;
 
-  if (bits % BITS_PER_LONG)
+  if (bits % BITS_PER_WORD)
     if ((bitmap1[k] ^ bitmap2[k]) & BITMAP_LAST_WORD_MASK(bits))
       return 0;
 
   return 1;
 }
 
-void __bitmap_complement(unsigned long *dst, const unsigned long *src, int bits)
+void __bitmap_complement(bitmap_t *dst, const bitmap_t *src, int bits)
 {
-  int k, lim = bits/BITS_PER_LONG;
+  int k, lim = bits/BITS_PER_WORD;
   for (k = 0; k < lim; ++k)
     dst[k] = ~src[k];
 
-  if (bits % BITS_PER_LONG)
+  if (bits % BITS_PER_WORD)
     dst[k] = ~src[k] & BITMAP_LAST_WORD_MASK(bits);
 }
 
@@ -119,14 +119,14 @@ void __bitmap_complement(unsigned long *dst, const unsigned long *src, int bits)
  * direction.  Zeros are fed into the vacated MS positions and the
  * LS bits shifted off the bottom are lost.
  */
-void __bitmap_shift_right(unsigned long *dst,
-        const unsigned long *src, int shift, int bits)
+void __bitmap_shift_right(bitmap_t *dst,
+        const bitmap_t *src, int shift, int bits)
 {
-  int k, lim = BITS_TO_LONGS(bits), left = bits % BITS_PER_LONG;
-  int off = shift/BITS_PER_LONG, rem = shift % BITS_PER_LONG;
-  unsigned long mask = (1UL << left) - 1;
+  int k, lim = BITS_TO_WORDS(bits), left = bits % BITS_PER_WORD;
+  int off = shift/BITS_PER_WORD, rem = shift % BITS_PER_WORD;
+  bitmap_t mask = (1UL << left) - 1;
   for (k = 0; off + k < lim; ++k) {
-    unsigned long upper, lower;
+    bitmap_t upper, lower;
 
     /*
      * If shift is not word aligned, take lower rem bits of
@@ -142,12 +142,12 @@ void __bitmap_shift_right(unsigned long *dst,
     lower = src[off + k];
     if (left && off + k == lim - 1)
       lower &= mask;
-    dst[k] = upper << (BITS_PER_LONG - rem) | lower >> rem;
+    dst[k] = upper << (BITS_PER_WORD - rem) | lower >> rem;
     if (left && k == lim - 1)
       dst[k] &= mask;
   }
   if (off)
-    memset(&dst[lim - off], 0, off*sizeof(unsigned long));
+    memset(&dst[lim - off], 0, off*sizeof(bitmap_t));
 }
 
 /**
@@ -162,13 +162,13 @@ void __bitmap_shift_right(unsigned long *dst,
  * and those MS bits shifted off the top are lost.
  */
 
-void __bitmap_shift_left(unsigned long *dst,
-       const unsigned long *src, int shift, int bits)
+void __bitmap_shift_left(bitmap_t *dst,
+       const bitmap_t *src, int shift, int bits)
 {
-  int k, lim = BITS_TO_LONGS(bits), left = bits % BITS_PER_LONG;
-  int off = shift/BITS_PER_LONG, rem = shift % BITS_PER_LONG;
+  int k, lim = BITS_TO_WORDS(bits), left = bits % BITS_PER_WORD;
+  int off = shift/BITS_PER_WORD, rem = shift % BITS_PER_WORD;
   for (k = lim - off - 1; k >= 0; --k) {
-    unsigned long upper, lower;
+    bitmap_t upper, lower;
 
     /*
      * If shift is not word aligned, take upper rem bits of
@@ -181,113 +181,113 @@ void __bitmap_shift_left(unsigned long *dst,
     upper = src[k];
     if (left && k == lim - 1)
       upper &= (1UL << left) - 1;
-    dst[k + off] = lower  >> (BITS_PER_LONG - rem) | upper << rem;
+    dst[k + off] = lower  >> (BITS_PER_WORD - rem) | upper << rem;
     if (left && k + off == lim - 1)
       dst[k + off] &= (1UL << left) - 1;
   }
   if (off)
-    memset(dst, 0, off*sizeof(unsigned long));
+    memset(dst, 0, off*sizeof(bitmap_t));
 }
 
-int __bitmap_and(unsigned long *dst, const unsigned long *bitmap1,
-     const unsigned long *bitmap2, int bits)
+int __bitmap_and(bitmap_t *dst, const bitmap_t *bitmap1,
+     const bitmap_t *bitmap2, int bits)
 {
   int k;
-  int nr = BITS_TO_LONGS(bits);
-  unsigned long result = 0;
+  int nr = BITS_TO_WORDS(bits);
+  bitmap_t result = 0;
 
   for (k = 0; k < nr; k++)
     result |= (dst[k] = bitmap1[k] & bitmap2[k]);
   return result != 0;
 }
 
-void __bitmap_or(unsigned long *dst, const unsigned long *bitmap1,
-     const unsigned long *bitmap2, int bits)
+void __bitmap_or(bitmap_t *dst, const bitmap_t *bitmap1,
+     const bitmap_t *bitmap2, int bits)
 {
   int k;
-  int nr = BITS_TO_LONGS(bits);
+  int nr = BITS_TO_WORDS(bits);
 
   for (k = 0; k < nr; k++)
     dst[k] = bitmap1[k] | bitmap2[k];
 }
 
-void __bitmap_xor(unsigned long *dst, const unsigned long *bitmap1,
-      const unsigned long *bitmap2, int bits)
+void __bitmap_xor(bitmap_t *dst, const bitmap_t *bitmap1,
+      const bitmap_t *bitmap2, int bits)
 {
   int k;
-  int nr = BITS_TO_LONGS(bits);
+  int nr = BITS_TO_WORDS(bits);
 
   for (k = 0; k < nr; k++)
     dst[k] = bitmap1[k] ^ bitmap2[k];
 }
 
-int __bitmap_andnot(unsigned long *dst, const unsigned long *bitmap1,
-        const unsigned long *bitmap2, int bits)
+int __bitmap_andnot(bitmap_t *dst, const bitmap_t *bitmap1,
+        const bitmap_t *bitmap2, int bits)
 {
   int k;
-  int nr = BITS_TO_LONGS(bits);
-  unsigned long result = 0;
+  int nr = BITS_TO_WORDS(bits);
+  bitmap_t result = 0;
 
   for (k = 0; k < nr; k++)
     result |= (dst[k] = bitmap1[k] & ~bitmap2[k]);
   return result != 0;
 }
 
-int __bitmap_intersects(const unsigned long *bitmap1,
-      const unsigned long *bitmap2, int bits)
+int __bitmap_intersects(const bitmap_t *bitmap1,
+      const bitmap_t *bitmap2, int bits)
 {
-  int k, lim = bits/BITS_PER_LONG;
+  int k, lim = bits/BITS_PER_WORD;
   for (k = 0; k < lim; ++k)
     if (bitmap1[k] & bitmap2[k])
       return 1;
 
-  if (bits % BITS_PER_LONG)
+  if (bits % BITS_PER_WORD)
     if ((bitmap1[k] & bitmap2[k]) & BITMAP_LAST_WORD_MASK(bits))
       return 1;
   return 0;
 }
 
-int __bitmap_subset(const unsigned long *bitmap1,
-        const unsigned long *bitmap2, int bits)
+int __bitmap_subset(const bitmap_t *bitmap1,
+        const bitmap_t *bitmap2, int bits)
 {
-  int k, lim = bits/BITS_PER_LONG;
+  int k, lim = bits/BITS_PER_WORD;
   for (k = 0; k < lim; ++k)
     if (bitmap1[k] & ~bitmap2[k])
       return 0;
 
-  if (bits % BITS_PER_LONG)
+  if (bits % BITS_PER_WORD)
     if ((bitmap1[k] & ~bitmap2[k]) & BITMAP_LAST_WORD_MASK(bits))
       return 0;
   return 1;
 }
 
-int __bitmap_weight(const unsigned long *bitmap, int bits)
+int __bitmap_weight(const bitmap_t *bitmap, int bits)
 {
-  int k, w = 0, lim = bits/BITS_PER_LONG;
+  int k, w = 0, lim = bits/BITS_PER_WORD;
 
   for (k = 0; k < lim; k++)
     w += hweight_long(bitmap[k]);
 
-  if (bits % BITS_PER_LONG)
+  if (bits % BITS_PER_WORD)
     w += hweight_long(bitmap[k] & BITMAP_LAST_WORD_MASK(bits));
 
   return w;
 }
 
-#define BITMAP_FIRST_WORD_MASK(start) (~0UL << ((start) % BITS_PER_LONG))
+#define BITMAP_FIRST_WORD_MASK(start) (~NUL_BYTE << ((start) % BITS_PER_WORD))
 
-void bitmap_set(unsigned long *map, int start, int nr)
+void bitmap_set(bitmap_t *map, int start, int nr)
 {
-  unsigned long *p = map + BIT_WORD(start);
+  bitmap_t *p = map + BIT_WORD(start);
   const int size = start + nr;
-  int bits_to_set = BITS_PER_LONG - (start % BITS_PER_LONG);
-  unsigned long mask_to_set = BITMAP_FIRST_WORD_MASK(start);
+  int bits_to_set = BITS_PER_WORD - (start % BITS_PER_WORD);
+  bitmap_t mask_to_set = BITMAP_FIRST_WORD_MASK(start);
 
   while (nr - bits_to_set >= 0) {
     *p |= mask_to_set;
     nr -= bits_to_set;
-    bits_to_set = BITS_PER_LONG;
-    mask_to_set = ~0UL;
+    bits_to_set = BITS_PER_WORD;
+    mask_to_set = ~NUL_BYTE;
     p++;
   }
   if (nr) {
@@ -296,18 +296,18 @@ void bitmap_set(unsigned long *map, int start, int nr)
   }
 }
 
-void bitmap_clear(unsigned long *map, int start, int nr)
+void bitmap_clear(bitmap_t *map, int start, int nr)
 {
-  unsigned long *p = map + BIT_WORD(start);
+  bitmap_t *p = map + BIT_WORD(start);
   const int size = start + nr;
-  int bits_to_clear = BITS_PER_LONG - (start % BITS_PER_LONG);
-  unsigned long mask_to_clear = BITMAP_FIRST_WORD_MASK(start);
+  int bits_to_clear = BITS_PER_WORD - (start % BITS_PER_WORD);
+  bitmap_t mask_to_clear = BITMAP_FIRST_WORD_MASK(start);
 
   while (nr - bits_to_clear >= 0) {
     *p &= ~mask_to_clear;
     nr -= bits_to_clear;
-    bits_to_clear = BITS_PER_LONG;
-    mask_to_clear = ~0UL;
+    bits_to_clear = BITS_PER_WORD;
+    mask_to_clear = ~NUL_BYTE;
     p++;
   }
   if (nr) {
@@ -328,13 +328,13 @@ void bitmap_clear(unsigned long *map, int start, int nr)
  * the bit offset of all zero areas this function finds is multiples of that
  * power of 2. A @align_mask of 0 means no alignment is required.
  */
-unsigned long bitmap_find_next_zero_area(unsigned long *map,
-           unsigned long size,
-           unsigned long start,
+bitmap_t bitmap_find_next_zero_area(bitmap_t *map,
+           bitmap_t size,
+           bitmap_t start,
            unsigned int nr,
-           unsigned long align_mask)
+           bitmap_t align_mask)
 {
-  unsigned long index, end, i;
+  bitmap_t index, end, i;
 again:
   index = find_next_zero_bit(map, size, start);
 
@@ -372,10 +372,10 @@ again:
  * comma-separated sets of eight digits per set.
  */
 int bitmap_snprintf(char *buf, unsigned int buflen,
-  const unsigned long *maskp, int nmaskbits)
+  const bitmap_t *maskp, int nmaskbits)
 {
   int i, word, bit, len = 0;
-  unsigned long val;
+  bitmap_t val;
   const char *sep = "";
   int chunksz;
   uint32_t chunkmask;
@@ -387,8 +387,8 @@ int bitmap_snprintf(char *buf, unsigned int buflen,
   i = ALIGN(nmaskbits, CHUNKSZ) - CHUNKSZ;
   for (; i >= 0; i -= CHUNKSZ) {
     chunkmask = ((1ULL << chunksz) - 1);
-    word = i / BITS_PER_LONG;
-    bit = i % BITS_PER_LONG;
+    word = i / BITS_PER_WORD;
+    bit = i % BITS_PER_WORD;
     val = (maskp[word] >> bit) & chunkmask;
     len += snprintf(buf+len, buflen-len, "%s%0*lx", sep, (chunksz+3)/4, val);
     chunksz = CHUNKSZ;
@@ -434,7 +434,7 @@ static inline int bsnl_emit(char *buf, int buflen, int rbot, int rtop, int len)
  * per ISO C99.
  */
 int bitmap_snlistprintf(char *buf, unsigned int buflen,
-      const unsigned long *maskp, int nmaskbits)
+      const bitmap_t *maskp, int nmaskbits)
 {
   int len = 0;
   /* current bit is 'cur', most recently seen range is [rbot, rtop] */
@@ -473,7 +473,7 @@ int bitmap_snlistprintf(char *buf, unsigned int buflen,
  *    %-EINVAL: invalid character in string
  *    %-ERANGE: bit number specified too large for mask
  */
-int bitmap_parselist(const char *bp, unsigned long *maskp, unsigned int nmaskbits)
+int bitmap_parselist(const char *bp, bitmap_t *maskp, unsigned int nmaskbits)
 {
   unsigned a, b;
 
@@ -520,7 +520,7 @@ int bitmap_parselist(const char *bp, unsigned long *maskp, unsigned int nmaskbit
  *
  * The bit positions 0 through @bits are valid positions in @buf.
  */
-static int bitmap_pos_to_ord(const unsigned long *buf, int pos, int bits)
+static int bitmap_pos_to_ord(const bitmap_t *buf, int pos, int bits)
 {
   int i, ord;
 
@@ -555,7 +555,7 @@ static int bitmap_pos_to_ord(const unsigned long *buf, int pos, int bits)
  *
  * The bit positions 0 through @bits are valid positions in @buf.
  */
-static int bitmap_ord_to_pos(const unsigned long *buf, int ord, int bits)
+static int bitmap_ord_to_pos(const bitmap_t *buf, int ord, int bits)
 {
   int pos = 0;
 
@@ -605,8 +605,8 @@ static int bitmap_ord_to_pos(const unsigned long *buf, int ord, int bits)
  * with bits 1, 5 and 7 set, then @dst should leave with bits 1,
  * 13 and 15 set.
  */
-void bitmap_remap(unsigned long *dst, const unsigned long *src,
-      const unsigned long *old, const unsigned long *new,
+void bitmap_remap(bitmap_t *dst, const bitmap_t *src,
+      const bitmap_t *old, const bitmap_t *new,
       int bits)
 {
   int oldbit, w;
@@ -652,8 +652,8 @@ void bitmap_remap(unsigned long *dst, const unsigned long *src,
  * bit positions unchanged.  So if say @oldbit is 5, then this routine
  * returns 13.
  */
-int bitmap_bitremap(int oldbit, const unsigned long *old,
-        const unsigned long *new, int bits)
+int bitmap_bitremap(int oldbit, const bitmap_t *old,
+        const bitmap_t *new, int bits)
 {
   int w = bitmap_weight(new, bits);
   int n = bitmap_pos_to_ord(old, oldbit, bits);
@@ -727,7 +727,7 @@ int bitmap_bitremap(int oldbit, const unsigned long *old,
  *  bitmap_fold() then bitmap_onto, as suggested above to
  *  avoid the possitility of an empty @dst result:
  *
- *  unsigned long *tmp; // a temporary bitmap's bits
+ *  bitmap_t *tmp; // a temporary bitmap's bits
  *
  *  bitmap_fold(tmp, orig, bitmap_weight(relmap, bits), bits);
  *  bitmap_onto(dst, tmp, relmap, bits);
@@ -763,8 +763,8 @@ int bitmap_bitremap(int oldbit, const unsigned long *old,
  *
  * All bits in @dst not set by the above rule are cleared.
  */
-void bitmap_onto(unsigned long *dst, const unsigned long *orig,
-     const unsigned long *relmap, int bits)
+void bitmap_onto(bitmap_t *dst, const bitmap_t *orig,
+     const bitmap_t *relmap, int bits)
 {
   int n, m;   /* same meaning as in above comment */
 
@@ -802,7 +802,7 @@ void bitmap_onto(unsigned long *dst, const unsigned long *orig,
  * Clear all other bits in @dst.  See further the comment and
  * Example [2] for bitmap_onto() for why and how to use this.
  */
-void bitmap_fold(unsigned long *dst, const unsigned long *orig,
+void bitmap_fold(bitmap_t *dst, const bitmap_t *orig,
      int sz, int bits)
 {
   int oldbit;
@@ -818,7 +818,7 @@ void bitmap_fold(unsigned long *dst, const unsigned long *orig,
 
 /*
  * Common code for bitmap_*_region() routines.
- *  bitmap: array of unsigned longs corresponding to the bitmap
+ *  bitmap: array of bitmap_ts corresponding to the bitmap
  *  pos: the beginning of the region
  *  order: region size (log base 2 of number of bits)
  *  reg_op: operation(s) to perform on that region of bitmap
@@ -840,30 +840,30 @@ enum {
   REG_OP_RELEASE,   /* clear all bits in region */
 };
 
-static int __reg_op(unsigned long *bitmap, int pos, int order, int reg_op)
+static int __reg_op(bitmap_t *bitmap, int pos, int order, int reg_op)
 {
   int nbits_reg;    /* number of bits in region */
   int index;    /* index first long of region in bitmap */
   int offset;   /* bit offset region in bitmap[index] */
   int nlongs_reg;   /* num longs spanned by region in bitmap */
   int nbitsinlong;  /* num bits of region in each spanned long */
-  unsigned long mask; /* bitmask for one long of region */
+  bitmap_t mask; /* bitmask for one long of region */
   int i;      /* scans bitmap by longs */
   int ret = 0;    /* return value */
 
   /*
    * Either nlongs_reg == 1 (for small orders that fit in one long)
-   * or (offset == 0 && mask == ~0UL) (for larger multiword orders.)
+   * or (offset == 0 && mask == ~NUL_BYTE) (for larger multiword orders.)
    */
   nbits_reg = 1 << order;
-  index = pos / BITS_PER_LONG;
-  offset = pos - (index * BITS_PER_LONG);
-  nlongs_reg = BITS_TO_LONGS(nbits_reg);
-  nbitsinlong = MIN(nbits_reg,  BITS_PER_LONG);
+  index = pos / BITS_PER_WORD;
+  offset = pos - (index * BITS_PER_WORD);
+  nlongs_reg = BITS_TO_WORDS(nbits_reg);
+  nbitsinlong = MIN(nbits_reg,  BITS_PER_WORD);
 
   /*
    * Can't do "mask = (1UL << nbitsinlong) - 1", as that
-   * overflows if nbitsinlong == BITS_PER_LONG.
+   * overflows if nbitsinlong == BITS_PER_WORD.
    */
   mask = (1UL << (nbitsinlong - 1));
   mask += mask - 1;
@@ -894,7 +894,7 @@ done:
 
 /**
  * bitmap_find_free_region - find a contiguous aligned mem region
- *  @bitmap: array of unsigned longs corresponding to the bitmap
+ *  @bitmap: array of bitmap_ts corresponding to the bitmap
  *  @bits: number of bits in the bitmap
  *  @order: region size (log base 2 of number of bits) to find
  *
@@ -906,7 +906,7 @@ done:
  * Return the bit offset in bitmap of the allocated region,
  * or -errno on failure.
  */
-int bitmap_find_free_region(unsigned long *bitmap, int bits, int order)
+int bitmap_find_free_region(bitmap_t *bitmap, int bits, int order)
 {
   int pos, end;   /* scans bitmap by regions of size order */
 
@@ -921,7 +921,7 @@ int bitmap_find_free_region(unsigned long *bitmap, int bits, int order)
 
 /**
  * bitmap_release_region - release allocated bitmap region
- *  @bitmap: array of unsigned longs corresponding to the bitmap
+ *  @bitmap: array of bitmap_ts corresponding to the bitmap
  *  @pos: beginning of bit region to release
  *  @order: region size (log base 2 of number of bits) to release
  *
@@ -930,14 +930,14 @@ int bitmap_find_free_region(unsigned long *bitmap, int bits, int order)
  *
  * No return value.
  */
-void bitmap_release_region(unsigned long *bitmap, int pos, int order)
+void bitmap_release_region(bitmap_t *bitmap, int pos, int order)
 {
   __reg_op(bitmap, pos, order, REG_OP_RELEASE);
 }
 
 /**
  * bitmap_allocate_region - allocate bitmap region
- *  @bitmap: array of unsigned longs corresponding to the bitmap
+ *  @bitmap: array of bitmap_ts corresponding to the bitmap
  *  @pos: beginning of bit region to allocate
  *  @order: region size (log base 2 of number of bits) to allocate
  *
@@ -946,7 +946,7 @@ void bitmap_release_region(unsigned long *bitmap, int pos, int order)
  * Return 0 on success, or %-EBUSY if specified region wasn't
  * free (not all bits were zero).
  */
-int bitmap_allocate_region(unsigned long *bitmap, int pos, int order)
+int bitmap_allocate_region(bitmap_t *bitmap, int pos, int order)
 {
   if (!__reg_op(bitmap, pos, order, REG_OP_ISFREE))
     return -EBUSY;
@@ -960,13 +960,13 @@ int bitmap_allocate_region(unsigned long *bitmap, int pos, int order)
  * @src:   bitmap to copy
  * @nbits: number of bits in the bitmap
  *
- * Require nbits % BITS_PER_LONG == 0.
+ * Require nbits % BITS_PER_WORD == 0.
  */
-void bitmap_copy_le(void *dst, const unsigned long *src, int nbits)
+void bitmap_copy_le(void *dst, const bitmap_t *src, int nbits)
 {
-  unsigned long *d = dst;
+  bitmap_t *d = dst;
   int i;
 
-  for (i = 0; i < nbits/BITS_PER_LONG; i++)
+  for (i = 0; i < nbits/BITS_PER_WORD; i++)
     d[i] = src[i];
 }
