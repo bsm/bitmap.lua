@@ -1,10 +1,11 @@
-local BMSPF = "[B] %-12s%-15s%dms"
+local BMSPF = "[B] %-12s%-12s%9d ms%10d ns/ops"
 
 function benchmark(context, cycles, fun)
   local start = os.clock()
   local cycles = cycles
   for c=0,cycles-1 do fun(c) end
-  print(BMSPF:format(context, " (" .. cycles .. "x)", (os.clock()-start) * 1000))
+  local ms = (os.clock()-start) * 1e3
+  print(BMSPF:format(context, " (" .. cycles .. "x)", ms, ms/cycles*1e6))
 end
 
 local bitmap = require 'bitmap'
@@ -26,22 +27,22 @@ end)
 a:set(0, 70000)
 b:set(30000, 70000)
 
-benchmark('offsets', 500, function(i)
+benchmark('offsets', 1000, function(i)
   a:offsets()
 end)
 
-benchmark('weight', 20000, function(i)
+benchmark('weight', 50000, function(i)
   a:weight()
 end)
 
-benchmark('bor', 20000, function(i)
+benchmark('bor', 50000, function(i)
   a:bor(b)
 end)
 
-benchmark('band', 20000, function(i)
+benchmark('band', 50000, function(i)
   a:band(b)
 end)
 
-benchmark('bandnot', 20000, function(i)
+benchmark('bandnot', 50000, function(i)
   a:bandnot(b)
 end)
