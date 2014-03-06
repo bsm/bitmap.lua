@@ -1,2 +1,5 @@
 language: c
 script: make test
+before_install:
+ - sudo apt-get update -qq
+ - sudo apt-get install -qq locate lua5.1-dev
