@@ -1,14 +1,13 @@
 CC = cc
 W = -W -Wall
 OPT = -O2 -g -pedantic -std=c99 -fPIC
-CFLAGS	= $(OPT) $(W) $(XCFLAGS)
+CFLAGS = $(OPT) $(W) $(XCFLAGS)
 LDFLAGS = -O -shared $(XLDFLAGS)
-LUA_H = $(shell locate 'lua.h' | head -1)
-LUAINC = -I$(realpath $(dir $(LUA_H)))
+LUADIR = /usr/include/lua5.1/
 
 ifeq ($(OS),Darwin)
-  CFLAGS = $(CFLAGS) -fno-common
-  LDFLAGS = -bundle -undefined dynamic_lookup
+  CFLAGS= $(CFLAGS) -fno-common
+  LDFLAGS= -bundle -undefined dynamic_lookup
 endif
 
 default: all
@@ -28,7 +27,7 @@ bitmap.so: lua_bitmap.o bitmap.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
 lua_bitmap.o: lua_bitmap.c bitmap.h
-	$(CC) $(CFLAGS) $(LUAINC) -c $<
+	$(CC) $(CFLAGS) -I$(LUADIR) -c $<
 
 bitmap.o: bitmap.c bitmap.h
-	$(CC) $(CFLAGS) $(LUAINC) -c $<
+	$(CC) $(CFLAGS) -I$(LUADIR) -c $<
